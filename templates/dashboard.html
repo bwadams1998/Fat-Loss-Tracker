@@ -1,14 +1,54 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="stats">
-  <div class="card"><span>Latest weight</span><strong>{{ latest_weight or 'No data' }}</strong></div>
-  <div class="card"><span>Lost</span><strong>{{ lost if lost is not none else 'No data' }}</strong></div>
-  <div class="card"><span>Remaining</span><strong>{{ remaining if remaining is not none else 'No data' }}</strong></div>
-  <div class="card"><span>Daily target</span><strong>{{ goals.calories }} cal</strong></div>
+{% set latest_log = logs[0] if logs else none %}
+{% set calorie_pct = ((latest_log.calories or 0) / goals.calories * 100) if latest_log and goals.calories else 0 %}
+{% set protein_pct = ((latest_log.protein or 0) / goals.protein * 100) if latest_log and goals.protein else 0 %}
+{% set steps_pct = ((latest_log.steps or 0) / goals.steps * 100) if latest_log and goals.steps else 0 %}
+{% set goal_pct = ((lost or 0) / ((goals.start_weight or 0) - (goals.target_weight or 0)) * 100) if goals.start_weight and goals.target_weight and lost is not none and goals.start_weight > goals.target_weight else 0 %}
+
+<section class="hero-panel">
+  <div>
+    <p class="eyebrow">Fat loss dashboard</p>
+    <h2>Stay on target today.</h2>
+    <p>Track weight, calories, protein, steps, cardio, and workouts in one place.</p>
+  </div>
+  <div class="hero-goal">
+    <span>Goal progress</span>
+    <strong>{{ goal_pct|round(0) }}%</strong>
+    <div class="progress"><span style="width: {{ [goal_pct, 100]|min }}%"></span></div>
+  </div>
 </section>
 
-<section class="card">
-  <h2>Daily check in</h2>
+<section class="stats upgraded-stats">
+  <div class="stat-card"><span>Latest weight</span><strong>{{ latest_weight or 'No data' }}</strong><small>lb</small></div>
+  <div class="stat-card"><span>Lost</span><strong>{{ lost if lost is not none else 'No data' }}</strong><small>lb</small></div>
+  <div class="stat-card"><span>Remaining</span><strong>{{ remaining if remaining is not none else 'No data' }}</strong><small>lb</small></div>
+  <div class="stat-card"><span>Daily target</span><strong>{{ goals.calories }}</strong><small>cal</small></div>
+</section>
+
+<section class="progress-grid">
+  <div class="card progress-card">
+    <div class="progress-head"><span>Calories</span><strong>{{ latest_log.calories if latest_log and latest_log.calories else 0 }} / {{ goals.calories }}</strong></div>
+    <div class="progress"><span style="width: {{ [calorie_pct, 100]|min }}%"></span></div>
+  </div>
+  <div class="card progress-card">
+    <div class="progress-head"><span>Protein</span><strong>{{ latest_log.protein if latest_log and latest_log.protein else 0 }} / {{ goals.protein }}g</strong></div>
+    <div class="progress"><span style="width: {{ [protein_pct, 100]|min }}%"></span></div>
+  </div>
+  <div class="card progress-card">
+    <div class="progress-head"><span>Steps</span><strong>{{ latest_log.steps if latest_log and latest_log.steps else 0 }} / {{ goals.steps }}</strong></div>
+    <div class="progress"><span style="width: {{ [steps_pct, 100]|min }}%"></span></div>
+  </div>
+</section>
+
+<section class="card elevated-card">
+  <div class="section-title">
+    <div>
+      <p class="eyebrow">Today</p>
+      <h2>Daily check in</h2>
+    </div>
+    <span class="pill">{{ today }}</span>
+  </div>
   <form method="post" class="form-grid">
     <label>Date<input type="date" name="log_date" value="{{ today }}"></label>
     <label>Weight<input type="number" step="0.1" name="weight"></label>
@@ -21,8 +61,13 @@
   </form>
 </section>
 
-<section class="card">
-  <h2>Last 30 days</h2>
+<section class="card elevated-card">
+  <div class="section-title">
+    <div>
+      <p class="eyebrow">History</p>
+      <h2>Last 30 days</h2>
+    </div>
+  </div>
   <div class="table-wrap">
     <table>
       <tr><th>Date</th><th>Weight</th><th>Calories</th><th>Protein</th><th>Steps</th><th>Cardio</th></tr>

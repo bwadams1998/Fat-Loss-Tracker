@@ -1,4 +1,4 @@
-__pycache__/
-*.sqlite3
-.env
-.venv/
+Flask==3.0.3
+gunicorn==22.0.0
+Werkzeug==3.0.3
+psycopg2-binary==2.9.9

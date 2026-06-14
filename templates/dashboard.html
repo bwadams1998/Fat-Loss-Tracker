@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
 {% set latest_log = logs[0] if logs else none %}
-{% set calorie_pct = ((latest_log.calories or 0) / goals.calories * 100) if latest_log and goals.calories else 0 %}
-{% set protein_pct = ((latest_log.protein or 0) / goals.protein * 100) if latest_log and goals.protein else 0 %}
+{% set calorie_pct = ((latest_log.calories or 0) / macro_targets.calories * 100) if latest_log and macro_targets.calories else 0 %}
+{% set protein_pct = ((latest_log.protein or 0) / macro_targets.protein * 100) if latest_log and macro_targets.protein else 0 %}
 {% set steps_pct = ((latest_log.steps or 0) / goals.steps * 100) if latest_log and goals.steps else 0 %}
 {% set goal_pct = ((lost or 0) / ((goals.start_weight or 0) - (goals.target_weight or 0)) * 100) if goals.start_weight and goals.target_weight and lost is not none and goals.start_weight > goals.target_weight else 0 %}
 
@@ -23,16 +23,37 @@
   <div class="stat-card"><span>Latest weight</span><strong>{{ latest_weight or 'No data' }}</strong><small>lb</small></div>
   <div class="stat-card"><span>Lost</span><strong>{{ lost if lost is not none else 'No data' }}</strong><small>lb</small></div>
   <div class="stat-card"><span>Remaining</span><strong>{{ remaining if remaining is not none else 'No data' }}</strong><small>lb</small></div>
-  <div class="stat-card"><span>Daily target</span><strong>{{ goals.calories }}</strong><small>cal</small></div>
+  <div class="stat-card"><span>Daily target</span><strong>{{ macro_targets.calories }}</strong><small>cal</small></div>
+</section>
+
+<section class="card elevated-card macro-coach-card">
+  <div class="section-title">
+    <div>
+      <p class="eyebrow">Adaptive targets</p>
+      <h2>Today’s macros</h2>
+    </div>
+    <span class="pill">{{ macro_targets.status }}</span>
+  </div>
+  <div class="macro-grid">
+    <div class="macro-box"><span>Calories</span><strong>{{ macro_targets.calories }}</strong><small>{% if macro_targets.adjustment > 0 %}+{{ macro_targets.adjustment }}{% elif macro_targets.adjustment < 0 %}{{ macro_targets.adjustment }}{% else %}No change{% endif %}</small></div>
+    <div class="macro-box"><span>Protein</span><strong>{{ macro_targets.protein }}g</strong><small>muscle retention</small></div>
+    <div class="macro-box"><span>Carbs</span><strong>{{ macro_targets.carbs }}g</strong><small>training fuel</small></div>
+    <div class="macro-box"><span>Fat</span><strong>{{ macro_targets.fat }}g</strong><small>hormones</small></div>
+  </div>
+  <div class="coach-note">
+    <span>Recent 7 day average: {{ macro_targets.recent_avg or 'Need data' }}</span>
+    <span>Previous 7 day average: {{ macro_targets.previous_avg or 'Need data' }}</span>
+    <span>Weekly loss: {{ macro_targets.weekly_change if macro_targets.weekly_change is not none else 'Need data' }} lb</span>
+  </div>
 </section>
 
 <section class="progress-grid">
   <div class="card progress-card">
-    <div class="progress-head"><span>Calories</span><strong>{{ latest_log.calories if latest_log and latest_log.calories else 0 }} / {{ goals.calories }}</strong></div>
+    <div class="progress-head"><span>Calories</span><strong>{{ latest_log.calories if latest_log and latest_log.calories else 0 }} / {{ macro_targets.calories }}</strong></div>
     <div class="progress"><span style="width: {{ [calorie_pct, 100]|min }}%"></span></div>
   </div>
   <div class="card progress-card">
-    <div class="progress-head"><span>Protein</span><strong>{{ latest_log.protein if latest_log and latest_log.protein else 0 }} / {{ goals.protein }}g</strong></div>
+    <div class="progress-head"><span>Protein</span><strong>{{ latest_log.protein if latest_log and latest_log.protein else 0 }} / {{ macro_targets.protein }}g</strong></div>
     <div class="progress"><span style="width: {{ [protein_pct, 100]|min }}%"></span></div>
   </div>
   <div class="card progress-card">
@@ -52,8 +73,8 @@
   <form method="post" class="form-grid">
     <label>Date<input type="date" name="log_date" value="{{ today }}"></label>
     <label>Weight<input type="number" step="0.1" name="weight"></label>
-    <label>Calories<input type="number" name="calories" placeholder="{{ goals.calories }}"></label>
-    <label>Protein<input type="number" name="protein" placeholder="{{ goals.protein }}"></label>
+    <label>Calories<input type="number" name="calories" placeholder="{{ macro_targets.calories }}"></label>
+    <label>Protein<input type="number" name="protein" placeholder="{{ macro_targets.protein }}"></label>
     <label>Steps<input type="number" name="steps" placeholder="{{ goals.steps }}"></label>
     <label>Cardio minutes<input type="number" name="cardio_minutes"></label>
     <label class="wide">Notes<input name="notes" placeholder="hunger, sleep, workout quality"></label>

@@ -1,36 +1,378 @@
-{% extends "base.html" %}
-{% block content %}
-<section class="card">
-  <h2>Targets</h2>
-  <form method="post" class="form-grid">
-    <label>Start weight<input type="number" step="0.1" name="start_weight" value="{{ goals.start_weight or '' }}"></label>
-    <label>Target weight<input type="number" step="0.1" name="target_weight" value="{{ goals.target_weight or '' }}"></label>
-    <label>Target date<input type="date" name="target_date" value="{{ goals.target_date or '' }}"></label>
-    <label>Calories<input type="number" name="calories" value="{{ goals.calories }}"></label>
-    <label>Protein grams<input type="number" name="protein" value="{{ goals.protein }}"></label>
-    <label>Steps<input type="number" name="steps" value="{{ goals.steps }}"></label>
-    <button>Save targets</button>
-  </form>
-</section>
+import os
+import sqlite3
+from datetime import date, datetime
+from functools import wraps
+from flask import Flask, g, redirect, render_template, request, session, url_for, flash
+from werkzeug.security import generate_password_hash, check_password_hash
 
-<section class="card">
-  <h2>Measurements</h2>
-  <form method="post" action="{{ url_for('add_measurement') }}" class="form-grid">
-    <label>Date<input type="date" name="measure_date" value="{{ today }}"></label>
-    <label>Waist<input type="number" step="0.1" name="waist"></label>
-    <label>Chest<input type="number" step="0.1" name="chest"></label>
-    <label>Arm<input type="number" step="0.1" name="arm"></label>
-    <label>Thigh<input type="number" step="0.1" name="thigh"></label>
-    <label class="wide">Notes<input name="notes"></label>
-    <button>Save measurement</button>
-  </form>
-  <div class="table-wrap">
-    <table>
-      <tr><th>Date</th><th>Waist</th><th>Chest</th><th>Arm</th><th>Thigh</th></tr>
-      {% for row in measurements %}
-      <tr><td>{{ row.measure_date }}</td><td>{{ row.waist or '' }}</td><td>{{ row.chest or '' }}</td><td>{{ row.arm or '' }}</td><td>{{ row.thigh or '' }}</td></tr>
-      {% endfor %}
-    </table>
-  </div>
-</section>
-{% endblock %}
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DB_PATH = os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "fat_loss_tracker.sqlite3"))
+
+app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret-key")
+
+
+def db():
+    if "db" not in g:
+        g.db = sqlite3.connect(DB_PATH)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(error=None):
+    connection = g.pop("db", None)
+    if connection is not None:
+        connection.close()
+
+
+def init_db():
+    connection = sqlite3.connect(DB_PATH)
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS goals (
+            user_id INTEGER PRIMARY KEY,
+            start_weight REAL,
+            target_weight REAL,
+            target_date TEXT,
+            calories INTEGER DEFAULT 2300,
+            protein INTEGER DEFAULT 180,
+            steps INTEGER DEFAULT 10000,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS daily_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            log_date TEXT NOT NULL,
+            weight REAL,
+            calories INTEGER,
+            protein INTEGER,
+            steps INTEGER,
+            cardio_minutes INTEGER,
+            notes TEXT,
+            UNIQUE(user_id, log_date),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS measurements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            measure_date TEXT NOT NULL,
+            waist REAL,
+            chest REAL,
+            arm REAL,
+            thigh REAL,
+            notes TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS workouts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            workout_date TEXT NOT NULL,
+            split_day TEXT NOT NULL,
+            exercise TEXT NOT NULL,
+            sets TEXT,
+            reps TEXT,
+            weight TEXT,
+            notes TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+        """
+    )
+    connection.commit()
+    connection.close()
+
+
+WORKOUT_PLAN = {
+    "Push": [
+        {"exercise": "Bench Press", "sets": "3 to 4", "reps": "5 to 8"},
+        {"exercise": "Incline Dumbbell Press", "sets": "3", "reps": "8 to 10"},
+        {"exercise": "Overhead Press", "sets": "3", "reps": "6 to 10"},
+        {"exercise": "Lateral Raises", "sets": "4", "reps": "12 to 20"},
+        {"exercise": "Triceps Pushdown", "sets": "3", "reps": "10 to 15"},
+        {"exercise": "Overhead Triceps Extension", "sets": "2 to 3", "reps": "10 to 15"},
+    ],
+    "Pull": [
+        {"exercise": "Lat Pulldown or Pull Ups", "sets": "4", "reps": "6 to 12"},
+        {"exercise": "Barbell Row or Chest Supported Row", "sets": "3 to 4", "reps": "6 to 10"},
+        {"exercise": "Seated Cable Row", "sets": "3", "reps": "8 to 12"},
+        {"exercise": "Rear Delt Fly", "sets": "3", "reps": "12 to 20"},
+        {"exercise": "Barbell Curls", "sets": "3", "reps": "8 to 12"},
+        {"exercise": "Hammer Curls", "sets": "2 to 3", "reps": "10 to 15"},
+    ],
+    "Legs": [
+        {"exercise": "Smith Squat", "sets": "4", "reps": "5 to 8"},
+        {"exercise": "Romanian Deadlift", "sets": "3 to 4", "reps": "6 to 10"},
+        {"exercise": "Leg Curl", "sets": "3", "reps": "10 to 15"},
+        {"exercise": "Leg Extension", "sets": "3", "reps": "10 to 15"},
+        {"exercise": "Calf Raises", "sets": "4", "reps": "10 to 20"},
+        {"exercise": "Core Work", "sets": "10 to 15 min", "reps": "Planks, cable crunch, or leg raises"},
+    ],
+    "Shoulders and Arms": [
+        {"exercise": "Overhead Press", "sets": "3", "reps": "6 to 10"},
+        {"exercise": "Lateral Raises", "sets": "4 to 5", "reps": "12 to 20"},
+        {"exercise": "Rear Delt Fly", "sets": "3", "reps": "12 to 20"},
+        {"exercise": "Barbell Curls", "sets": "3", "reps": "8 to 12"},
+        {"exercise": "Incline Curls", "sets": "2 to 3", "reps": "10 to 15"},
+        {"exercise": "Skull Crushers", "sets": "3", "reps": "8 to 12"},
+        {"exercise": "Cable Pushdowns", "sets": "2 to 3", "reps": "10 to 15"},
+    ],
+    "Chest and Back": [
+        {"exercise": "Incline Bench Press", "sets": "3 to 4", "reps": "5 to 8"},
+        {"exercise": "Flat Dumbbell Press", "sets": "3", "reps": "8 to 10"},
+        {"exercise": "Cable Fly", "sets": "2 to 3", "reps": "12 to 15"},
+        {"exercise": "Pulldowns", "sets": "3", "reps": "8 to 12"},
+        {"exercise": "Rows", "sets": "3", "reps": "8 to 12"},
+        {"exercise": "Straight Arm Pulldown", "sets": "2", "reps": "12 to 15"},
+    ],
+    "Rest": [
+        {"exercise": "Steps", "sets": "1", "reps": "8,000 to 12,000 steps"},
+        {"exercise": "Optional Incline Walk", "sets": "1", "reps": "20 to 40 minutes"},
+    ],
+}
+
+
+init_db()
+
+
+def user_count():
+    return db().execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"]
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    first_user = user_count() == 0
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        if not email or not password:
+            flash("Enter an email and password.")
+            return redirect(url_for("login"))
+
+        if first_user:
+            password_hash = generate_password_hash(password)
+            cursor = db().execute(
+                "INSERT INTO users (email, password_hash, created_at) VALUES (?, ?, ?)",
+                (email, password_hash, datetime.utcnow().isoformat()),
+            )
+            db().execute("INSERT INTO goals (user_id) VALUES (?)", (cursor.lastrowid,))
+            db().commit()
+            session["user_id"] = cursor.lastrowid
+            return redirect(url_for("dashboard"))
+
+        user = db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        if user and check_password_hash(user["password_hash"], password):
+            session["user_id"] = user["id"]
+            return redirect(url_for("dashboard"))
+        flash("Wrong login.")
+    return render_template("login.html", first_user=first_user)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+@app.route("/", methods=["GET", "POST"])
+@login_required
+def dashboard():
+    uid = session["user_id"]
+    today = date.today().isoformat()
+    if request.method == "POST":
+        data = (
+            uid,
+            request.form.get("log_date") or today,
+            request.form.get("weight") or None,
+            request.form.get("calories") or None,
+            request.form.get("protein") or None,
+            request.form.get("steps") or None,
+            request.form.get("cardio_minutes") or None,
+            request.form.get("notes") or None,
+        )
+        db().execute(
+            """
+            INSERT INTO daily_logs (user_id, log_date, weight, calories, protein, steps, cardio_minutes, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, log_date) DO UPDATE SET
+                weight=excluded.weight,
+                calories=excluded.calories,
+                protein=excluded.protein,
+                steps=excluded.steps,
+                cardio_minutes=excluded.cardio_minutes,
+                notes=excluded.notes
+            """,
+            data,
+        )
+        db().commit()
+        return redirect(url_for("dashboard"))
+
+    goals = db().execute("SELECT * FROM goals WHERE user_id = ?", (uid,)).fetchone()
+    logs = db().execute(
+        "SELECT * FROM daily_logs WHERE user_id = ? ORDER BY log_date DESC LIMIT 30", (uid,)
+    ).fetchall()
+    weights = [row["weight"] for row in logs if row["weight"] is not None]
+    latest_weight = weights[0] if weights else None
+    start_weight = goals["start_weight"] if goals else None
+    target_weight = goals["target_weight"] if goals else None
+    lost = round(start_weight - latest_weight, 1) if start_weight and latest_weight else None
+    remaining = round(latest_weight - target_weight, 1) if latest_weight and target_weight else None
+    return render_template(
+        "dashboard.html",
+        today=today,
+        goals=goals,
+        logs=logs,
+        latest_weight=latest_weight,
+        lost=lost,
+        remaining=remaining,
+    )
+
+
+@app.route("/workouts", methods=["GET", "POST"])
+@login_required
+def workouts():
+    uid = session["user_id"]
+    today = date.today().isoformat()
+    split_days = list(WORKOUT_PLAN.keys())
+
+    if request.method == "POST":
+        workout_date = request.form.get("workout_date") or today
+        split_day = request.form.get("split_day") or "Push"
+        exercises = request.form.getlist("exercise")
+        sets_list = request.form.getlist("sets")
+        reps_list = request.form.getlist("reps")
+        weights = request.form.getlist("weight")
+        notes_list = request.form.getlist("notes")
+
+        for index, exercise in enumerate(exercises):
+            weight = weights[index].strip() if index < len(weights) else ""
+            notes = notes_list[index].strip() if index < len(notes_list) else ""
+            if not weight and not notes:
+                continue
+            db().execute(
+                """
+                INSERT INTO workouts (user_id, workout_date, split_day, exercise, sets, reps, weight, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    uid,
+                    workout_date,
+                    split_day,
+                    exercise,
+                    sets_list[index] if index < len(sets_list) else "",
+                    reps_list[index] if index < len(reps_list) else "",
+                    weight,
+                    notes,
+                ),
+            )
+        db().commit()
+        return redirect(url_for("workouts", day=split_day))
+
+    selected_day = request.args.get("day") or "Push"
+    if selected_day not in WORKOUT_PLAN:
+        selected_day = "Push"
+
+    plan_items = []
+    for item in WORKOUT_PLAN[selected_day]:
+        last = db().execute(
+            """
+            SELECT weight, reps, workout_date FROM workouts
+            WHERE user_id = ? AND exercise = ? AND weight IS NOT NULL AND weight != ''
+            ORDER BY workout_date DESC, id DESC LIMIT 1
+            """,
+            (uid, item["exercise"]),
+        ).fetchone()
+        plan_items.append({**item, "last": last})
+
+    items = db().execute(
+        "SELECT * FROM workouts WHERE user_id = ? ORDER BY workout_date DESC, id DESC LIMIT 80",
+        (uid,),
+    ).fetchall()
+    return render_template(
+        "workouts.html",
+        today=today,
+        split_days=split_days,
+        selected_day=selected_day,
+        plan_items=plan_items,
+        items=items,
+    )
+
+
+@app.route("/measurements", methods=["POST"])
+@login_required
+def add_measurement():
+    uid = session["user_id"]
+    db().execute(
+        """
+        INSERT INTO measurements (user_id, measure_date, waist, chest, arm, thigh, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            uid,
+            request.form.get("measure_date") or date.today().isoformat(),
+            request.form.get("waist") or None,
+            request.form.get("chest") or None,
+            request.form.get("arm") or None,
+            request.form.get("thigh") or None,
+            request.form.get("notes") or None,
+        ),
+    )
+    db().commit()
+    return redirect(url_for("settings"))
+
+
+@app.route("/settings", methods=["GET", "POST"])
+@login_required
+def settings():
+    uid = session["user_id"]
+    if request.method == "POST":
+        db().execute(
+            """
+            UPDATE goals SET start_weight=?, target_weight=?, target_date=?, calories=?, protein=?, steps=?
+            WHERE user_id=?
+            """,
+            (
+                request.form.get("start_weight") or None,
+                request.form.get("target_weight") or None,
+                request.form.get("target_date") or None,
+                request.form.get("calories") or 2300,
+                request.form.get("protein") or 180,
+                request.form.get("steps") or 10000,
+                uid,
+            ),
+        )
+        db().commit()
+        return redirect(url_for("settings"))
+    goals = db().execute("SELECT * FROM goals WHERE user_id = ?", (uid,)).fetchone()
+    measurements = db().execute(
+        "SELECT * FROM measurements WHERE user_id = ? ORDER BY measure_date DESC LIMIT 20", (uid,)
+    ).fetchall()
+    return render_template("settings.html", goals=goals, measurements=measurements, today=date.today().isoformat())
+
+
+@app.route("/plan")
+@login_required
+def plan():
+    return render_template("plan.html")
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)

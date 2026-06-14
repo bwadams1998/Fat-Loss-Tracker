@@ -180,3 +180,40 @@ tr:last-child td { border-bottom: 0; }
   .wide { grid-column: auto; }
   main { padding-top: 16px; }
 }
+
+
+.data-hero { align-items: center; }
+.hero-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.soft-button, .mini-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 10px 13px;
+  font-weight: 900;
+  background: #eef2ff;
+  color: #1e3a8a;
+  border: 1px solid #c7d2fe;
+  white-space: nowrap;
+}
+.mini-button { padding: 8px 11px; font-size: 13px; }
+.actions-cell { display: flex; gap: 8px; align-items: center; }
+.actions-cell form { margin: 0; }
+.danger-button {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  box-shadow: none;
+  padding: 8px 11px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+.danger-button:hover { filter: brightness(.98); transform: none; }
+.edit-card { max-width: 980px; margin-left: auto; margin-right: auto; }
+.data-table td:last-child, .data-table th:last-child { position: sticky; right: 0; background: white; }
+@media (max-width: 800px) {
+  .actions-cell { min-width: 140px; }
+  .hero-actions { justify-content: stretch; }
+  .soft-button { flex: 1; }
+}

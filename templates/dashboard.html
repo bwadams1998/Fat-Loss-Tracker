@@ -24,6 +24,7 @@
   <div class="stat-card"><span>Lost</span><strong>{{ lost if lost is not none else 'No data' }}</strong><small>lb</small></div>
   <div class="stat-card"><span>Remaining</span><strong>{{ remaining if remaining is not none else 'No data' }}</strong><small>lb</small></div>
   <div class="stat-card"><span>Daily target</span><strong>{{ macro_targets.calories }}</strong><small>cal</small></div>
+  <div class="stat-card"><span>Estimated goal</span><strong>{{ macro_targets.estimated_goal_date or 'Need data' }}</strong><small>{% if macro_targets.weeks_to_goal %}{{ macro_targets.weeks_to_goal }} weeks{% else %}log weight{% endif %}</small></div>
 </section>
 
 <section class="card elevated-card macro-coach-card">
@@ -44,6 +45,8 @@
     <span>Recent 7 day average: {{ macro_targets.recent_avg or 'Need data' }}</span>
     <span>Previous 7 day average: {{ macro_targets.previous_avg or 'Need data' }}</span>
     <span>Weekly loss: {{ macro_targets.weekly_change if macro_targets.weekly_change is not none else 'Need data' }} lb</span>
+    <span>BMR: {{ macro_targets.bmr or 'Need profile' }}</span>
+    <span>Maintenance: {{ macro_targets.tdee or 'Need profile' }}</span>
   </div>
 </section>
 

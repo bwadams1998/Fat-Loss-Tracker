@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero-panel">
+  <div>
+    <p class="eyebrow">Profile</p>
+    <h2>Your calorie engine</h2>
+    <p>These details drive your BMR, maintenance calories, calorie deficit, macros, and estimated goal date.</p>
+  </div>
+  <div class="hero-goal">
+    <span>Estimated maintenance</span>
+    <strong>{{ macro_targets.tdee or 'Need data' }}</strong>
+    <small>calories per day</small>
+  </div>
+</section>
+
+<section class="card elevated-card">
+  <div class="section-title">
+    <div>
+      <p class="eyebrow">Personal details</p>
+      <h2>Body and activity profile</h2>
+    </div>
+    <span class="pill">Updates macro targets</span>
+  </div>
+  <form method="post" class="form-grid">
+    <label>Height feet<input type="number" name="height_feet" value="{{ height_feet }}"></label>
+    <label>Height inches<input type="number" step="0.1" name="height_inches_extra" value="{{ height_inches_extra }}"></label>
+    <label>Age<input type="number" name="age" value="{{ profile.age or 27 }}"></label>
+    <label>Sex
+      <select name="sex">
+        <option value="male" {% if profile.sex == 'male' %}selected{% endif %}>Male</option>
+        <option value="female" {% if profile.sex == 'female' %}selected{% endif %}>Female</option>
+      </select>
+    </label>
+    <label>Activity level
+      <select name="activity_level">
+        <option value="sedentary" {% if profile.activity_level == 'sedentary' %}selected{% endif %}>Sedentary</option>
+        <option value="light" {% if profile.activity_level == 'light' %}selected{% endif %}>Light</option>
+        <option value="moderate" {% if profile.activity_level == 'moderate' %}selected{% endif %}>Moderate</option>
+        <option value="high" {% if profile.activity_level == 'high' %}selected{% endif %}>High</option>
+        <option value="athlete" {% if profile.activity_level == 'athlete' %}selected{% endif %}>Athlete</option>
+      </select>
+    </label>
+    <label>Training days per week<input type="number" name="training_days" min="0" max="7" value="{{ profile.training_days or 5 }}"></label>
+    <label>Target loss per week
+      <select name="deficit_rate">
+        <option value="0.75" {% if profile.deficit_rate == 0.75 %}selected{% endif %}>0.75 lb per week</option>
+        <option value="1.0" {% if profile.deficit_rate == 1.0 %}selected{% endif %}>1.0 lb per week</option>
+        <option value="1.25" {% if profile.deficit_rate == 1.25 %}selected{% endif %}>1.25 lb per week</option>
+        <option value="1.5" {% if profile.deficit_rate == 1.5 %}selected{% endif %}>1.5 lb per week</option>
+      </select>
+    </label>
+    <button>Save profile</button>
+  </form>
+</section>
+
+<section class="card elevated-card macro-coach-card">
+  <div class="section-title">
+    <div>
+      <p class="eyebrow">Calculated targets</p>
+      <h2>Your current recommendation</h2>
+    </div>
+    <span class="pill">{{ macro_targets.status }}</span>
+  </div>
+  <div class="macro-grid">
+    <div class="macro-box"><span>BMR</span><strong>{{ macro_targets.bmr or 'Need data' }}</strong><small>base burn</small></div>
+    <div class="macro-box"><span>Maintenance</span><strong>{{ macro_targets.tdee or 'Need data' }}</strong><small>estimated TDEE</small></div>
+    <div class="macro-box"><span>Calories</span><strong>{{ macro_targets.calories }}</strong><small>daily target</small></div>
+    <div class="macro-box"><span>Protein</span><strong>{{ macro_targets.protein }}g</strong><small>daily target</small></div>
+    <div class="macro-box"><span>Carbs</span><strong>{{ macro_targets.carbs }}g</strong><small>daily target</small></div>
+    <div class="macro-box"><span>Fats</span><strong>{{ macro_targets.fat }}g</strong><small>daily target</small></div>
+    <div class="macro-box"><span>Goal date</span><strong>{{ macro_targets.estimated_goal_date or 'Need data' }}</strong><small>{% if macro_targets.weeks_to_goal %}{{ macro_targets.weeks_to_goal }} weeks{% else %}log weigh ins{% endif %}</small></div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Workout plan</h2>
+  <p class="small">Pick the day, enter the weight you used, add notes, then save. Leave blank exercises empty if you skipped them.</p>
+  <div class="day-tabs">
+    {% for d in split_days %}
+      <a class="tab {% if d == selected_day %}active{% endif %}" href="{{ url_for('workouts', day=d) }}">{{ d }}</a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <h2>{{ selected_day }}</h2>
+  <form method="post">
+    <input type="hidden" name="split_day" value="{{ selected_day }}">
+    <label class="date-row">Date<input type="date" name="workout_date" value="{{ today }}"></label>
+
+    <div class="exercise-list">
+      {% for item in plan_items %}
+      <div class="exercise-card">
+        <div>
+          <h3>{{ item.exercise }}</h3>
+          <p class="small">{{ item.sets }} sets, {{ item.reps }} reps</p>
+          {% if item.last %}
+            <p class="small">Last: {{ item.last.weight }} lb, {{ item.last.reps }} on {{ item.last.workout_date }}</p>
+          {% else %}
+            <p class="small">Last: no weight logged yet</p>
+          {% endif %}
+        </div>
+        <input type="hidden" name="exercise" value="{{ item.exercise }}">
+        <input type="hidden" name="sets" value="{{ item.sets }}">
+        <input type="hidden" name="reps" value="{{ item.reps }}">
+        <label>Weight used<input name="weight" inputmode="decimal" placeholder="185"></label>
+        <label>Notes<input name="notes" placeholder="8,8,7 reps. 1 rep left."></label>
+      </div>
+      {% endfor %}
+    </div>
+
+    <button class="save-workout">Save workout</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Recent exercises</h2>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Date</th><th>Day</th><th>Exercise</th><th>Sets</th><th>Target Reps</th><th>Weight</th><th>Notes</th></tr>
+      {% for row in items %}
+      <tr>
+        <td>{{ row.workout_date }}</td>
+        <td>{{ row.split_day }}</td>
+        <td>{{ row.exercise }}</td>
+        <td>{{ row.sets }}</td>
+        <td>{{ row.reps }}</td>
+        <td>{{ row.weight }}</td>
+        <td>{{ row.notes }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</section>
+{% endblock %}

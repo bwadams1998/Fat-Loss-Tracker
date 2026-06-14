@@ -83,11 +83,16 @@ def init_db():
             sets TEXT,
             reps TEXT,
             weight TEXT,
+            actual_reps TEXT,
             notes TEXT,
             FOREIGN KEY(user_id) REFERENCES users(id)
         );
         """
     )
+    # Lightweight migration for existing Railway databases.
+    columns = [row[1] for row in connection.execute("PRAGMA table_info(workouts)").fetchall()]
+    if "actual_reps" not in columns:
+        connection.execute("ALTER TABLE workouts ADD COLUMN actual_reps TEXT")
     connection.commit()
     connection.close()
 
@@ -260,17 +265,19 @@ def workouts():
         sets_list = request.form.getlist("sets")
         reps_list = request.form.getlist("reps")
         weights = request.form.getlist("weight")
+        actual_reps_list = request.form.getlist("actual_reps")
         notes_list = request.form.getlist("notes")
 
         for index, exercise in enumerate(exercises):
             weight = weights[index].strip() if index < len(weights) else ""
+            actual_reps = actual_reps_list[index].strip() if index < len(actual_reps_list) else ""
             notes = notes_list[index].strip() if index < len(notes_list) else ""
-            if not weight and not notes:
+            if not weight and not actual_reps and not notes:
                 continue
             db().execute(
                 """
-                INSERT INTO workouts (user_id, workout_date, split_day, exercise, sets, reps, weight, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO workouts (user_id, workout_date, split_day, exercise, sets, reps, weight, actual_reps, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     uid,
@@ -280,6 +287,7 @@ def workouts():
                     sets_list[index] if index < len(sets_list) else "",
                     reps_list[index] if index < len(reps_list) else "",
                     weight,
+                    actual_reps,
                     notes,
                 ),
             )
@@ -294,7 +302,7 @@ def workouts():
     for item in WORKOUT_PLAN[selected_day]:
         last = db().execute(
             """
-            SELECT weight, reps, workout_date FROM workouts
+            SELECT weight, actual_reps, workout_date FROM workouts
             WHERE user_id = ? AND exercise = ? AND weight IS NOT NULL AND weight != ''
             ORDER BY workout_date DESC, id DESC LIMIT 1
             """,
@@ -366,6 +374,162 @@ def settings():
         "SELECT * FROM measurements WHERE user_id = ? ORDER BY measure_date DESC LIMIT 20", (uid,)
     ).fetchall()
     return render_template("settings.html", goals=goals, measurements=measurements, today=date.today().isoformat())
+
+
+@app.route("/data")
+@login_required
+def data_management():
+    uid = session["user_id"]
+    logs = db().execute(
+        "SELECT * FROM daily_logs WHERE user_id = ? ORDER BY log_date DESC LIMIT 90", (uid,)
+    ).fetchall()
+    measurements = db().execute(
+        "SELECT * FROM measurements WHERE user_id = ? ORDER BY measure_date DESC, id DESC LIMIT 90", (uid,)
+    ).fetchall()
+    workout_entries = db().execute(
+        "SELECT * FROM workouts WHERE user_id = ? ORDER BY workout_date DESC, id DESC LIMIT 150", (uid,)
+    ).fetchall()
+    return render_template(
+        "data.html",
+        logs=logs,
+        measurements=measurements,
+        workout_entries=workout_entries,
+    )
+
+
+@app.route("/data/daily/<int:entry_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_daily_log(entry_id):
+    uid = session["user_id"]
+    entry = db().execute(
+        "SELECT * FROM daily_logs WHERE id = ? AND user_id = ?", (entry_id, uid)
+    ).fetchone()
+    if not entry:
+        flash("Entry not found.")
+        return redirect(url_for("data_management"))
+    if request.method == "POST":
+        db().execute(
+            """
+            UPDATE daily_logs
+            SET log_date=?, weight=?, calories=?, protein=?, steps=?, cardio_minutes=?, notes=?
+            WHERE id=? AND user_id=?
+            """,
+            (
+                request.form.get("log_date") or date.today().isoformat(),
+                request.form.get("weight") or None,
+                request.form.get("calories") or None,
+                request.form.get("protein") or None,
+                request.form.get("steps") or None,
+                request.form.get("cardio_minutes") or None,
+                request.form.get("notes") or None,
+                entry_id,
+                uid,
+            ),
+        )
+        db().commit()
+        flash("Daily log updated.")
+        return redirect(url_for("data_management"))
+    return render_template("edit_daily.html", entry=entry)
+
+
+@app.route("/data/daily/<int:entry_id>/delete", methods=["POST"])
+@login_required
+def delete_daily_log(entry_id):
+    uid = session["user_id"]
+    db().execute("DELETE FROM daily_logs WHERE id = ? AND user_id = ?", (entry_id, uid))
+    db().commit()
+    flash("Daily log deleted.")
+    return redirect(url_for("data_management"))
+
+
+@app.route("/data/measurement/<int:entry_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_measurement(entry_id):
+    uid = session["user_id"]
+    entry = db().execute(
+        "SELECT * FROM measurements WHERE id = ? AND user_id = ?", (entry_id, uid)
+    ).fetchone()
+    if not entry:
+        flash("Measurement not found.")
+        return redirect(url_for("data_management"))
+    if request.method == "POST":
+        db().execute(
+            """
+            UPDATE measurements
+            SET measure_date=?, waist=?, chest=?, arm=?, thigh=?, notes=?
+            WHERE id=? AND user_id=?
+            """,
+            (
+                request.form.get("measure_date") or date.today().isoformat(),
+                request.form.get("waist") or None,
+                request.form.get("chest") or None,
+                request.form.get("arm") or None,
+                request.form.get("thigh") or None,
+                request.form.get("notes") or None,
+                entry_id,
+                uid,
+            ),
+        )
+        db().commit()
+        flash("Measurement updated.")
+        return redirect(url_for("data_management"))
+    return render_template("edit_measurement.html", entry=entry)
+
+
+@app.route("/data/measurement/<int:entry_id>/delete", methods=["POST"])
+@login_required
+def delete_measurement(entry_id):
+    uid = session["user_id"]
+    db().execute("DELETE FROM measurements WHERE id = ? AND user_id = ?", (entry_id, uid))
+    db().commit()
+    flash("Measurement deleted.")
+    return redirect(url_for("data_management"))
+
+
+@app.route("/data/workout/<int:entry_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_workout_entry(entry_id):
+    uid = session["user_id"]
+    entry = db().execute(
+        "SELECT * FROM workouts WHERE id = ? AND user_id = ?", (entry_id, uid)
+    ).fetchone()
+    if not entry:
+        flash("Workout entry not found.")
+        return redirect(url_for("data_management"))
+    if request.method == "POST":
+        db().execute(
+            """
+            UPDATE workouts
+            SET workout_date=?, split_day=?, exercise=?, sets=?, reps=?, weight=?, actual_reps=?, notes=?
+            WHERE id=? AND user_id=?
+            """,
+            (
+                request.form.get("workout_date") or date.today().isoformat(),
+                request.form.get("split_day") or "Push",
+                request.form.get("exercise") or "",
+                request.form.get("sets") or "",
+                request.form.get("reps") or "",
+                request.form.get("weight") or "",
+                request.form.get("actual_reps") or "",
+                request.form.get("notes") or "",
+                entry_id,
+                uid,
+            ),
+        )
+        db().commit()
+        flash("Workout entry updated.")
+        return redirect(url_for("data_management"))
+    return render_template("edit_workout.html", entry=entry, split_days=list(WORKOUT_PLAN.keys()))
+
+
+@app.route("/data/workout/<int:entry_id>/delete", methods=["POST"])
+@login_required
+def delete_workout_entry(entry_id):
+    uid = session["user_id"]
+    db().execute("DELETE FROM workouts WHERE id = ? AND user_id = ?", (entry_id, uid))
+    db().commit()
+    flash("Workout entry deleted.")
+    return redirect(url_for("data_management"))
 
 
 @app.route("/plan")

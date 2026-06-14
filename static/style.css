@@ -32,3 +32,40 @@ th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
   .stats, .form-grid, .plan-grid { grid-template-columns: 1fr; }
   .wide { grid-column: auto; }
 }
+.day-tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.tab { text-decoration: none; color: #111; background: #eee; padding: 10px 12px; border-radius: 10px; font-weight: 700; }
+.tab.active { background: #111; color: white; }
+.date-row { max-width: 240px; margin-bottom: 16px; }
+.exercise-list { display: grid; gap: 14px; }
+.exercise-card { display: grid; grid-template-columns: 1.4fr .7fr 1fr; gap: 14px; align-items: end; background: #f7f7f7; border-radius: 14px; padding: 14px; }
+.exercise-card h3 { margin: 0 0 6px; }
+.save-workout { margin-top: 16px; }
+@media (max-width: 800px) {
+  .exercise-card { grid-template-columns: 1fr; }
+}
+
+/* Preset workout logger */
+.workout-hero { display: flex; justify-content: space-between; align-items: end; gap: 18px; }
+.eyebrow { margin: 0 0 6px; color: #666; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; }
+.workout-hero h2 { margin: 0 0 8px; font-size: 34px; }
+.quick-day-picker { min-width: 240px; }
+.day-strip-card { padding: 12px; }
+.workout-tabs { margin-top: 0; }
+.log-header { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 18px; }
+.log-header label { max-width: 220px; width: 100%; }
+.preset-list { gap: 16px; }
+.preset-card { grid-template-columns: 1.2fr 1.8fr; background: #f8f8f8; border: 1px solid #e8e8e8; }
+.exercise-main { display: flex; gap: 14px; align-items: flex-start; }
+.exercise-number { width: 34px; height: 34px; border-radius: 50%; background: #111; color: white; display: grid; place-items: center; font-weight: 800; flex: 0 0 34px; }
+.target-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.target-row span { background: white; border: 1px solid #ddd; padding: 6px 9px; border-radius: 999px; font-size: 13px; font-weight: 800; }
+.last-line { margin: 10px 0 0; font-size: 13px; color: #333; }
+.muted { color: #777; }
+.log-fields { display: grid; grid-template-columns: .7fr .8fr 1.5fr; gap: 12px; align-items: end; }
+.notes-field { min-width: 180px; }
+.bottom-save { width: 100%; margin-top: 18px; padding: 15px 18px; font-weight: 800; }
+@media (max-width: 850px) {
+  .workout-hero, .log-header { display: grid; }
+  .quick-day-picker, .log-header label { min-width: 0; max-width: none; }
+  .preset-card, .log-fields { grid-template-columns: 1fr; }
+}

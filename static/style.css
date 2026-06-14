@@ -277,3 +277,13 @@ tr:last-child td { border-bottom: 0; }
     grid-template-columns: 1fr;
   }
 }
+select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.04);
+  color: inherit;
+  font: inherit;
+}
+.hero-goal small { display: block; margin-top: 6px; opacity: .75; }

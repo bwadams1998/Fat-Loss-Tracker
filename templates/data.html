@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero-panel data-hero">
+  <div>
+    <p class="eyebrow">Data control</p>
+    <h2>Fix bad entries fast</h2>
+    <p>Edit or delete daily logs, workout entries, and measurements.</p>
+  </div>
+  <div class="hero-actions">
+    <a class="soft-button" href="{{ url_for('dashboard') }}">Daily log</a>
+    <a class="soft-button" href="{{ url_for('workouts') }}">Workout log</a>
+  </div>
+</section>
+
+<section class="card">
+  <div class="section-title">
+    <div>
+      <h2>Daily logs</h2>
+      <p class="small">Weight, calories, protein, steps, cardio, and notes.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Weight</th>
+          <th>Calories</th>
+          <th>Protein</th>
+          <th>Steps</th>
+          <th>Cardio</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in logs %}
+        <tr>
+          <td>{{ row.log_date }}</td>
+          <td>{{ row.weight or '' }}</td>
+          <td>{{ row.calories or '' }}</td>
+          <td>{{ row.protein or '' }}</td>
+          <td>{{ row.steps or '' }}</td>
+          <td>{{ row.cardio_minutes or '' }}</td>
+          <td class="actions-cell">
+            <a class="mini-button" href="{{ url_for('edit_daily_log', entry_id=row.id) }}">Edit</a>
+            <form method="post" action="{{ url_for('delete_daily_log', entry_id=row.id) }}" onsubmit="return confirm('Delete this daily log?');">
+              <button class="danger-button" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No daily logs yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="section-title">
+    <div>
+      <h2>Workout entries</h2>
+      <p class="small">Each exercise entry is editable on its own.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Day</th>
+          <th>Exercise</th>
+          <th>Target</th>
+          <th>Weight</th>
+          <th>Actual reps</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in workout_entries %}
+        <tr>
+          <td>{{ row.workout_date }}</td>
+          <td>{{ row.split_day }}</td>
+          <td>{{ row.exercise }}</td>
+          <td>{{ row.sets }} x {{ row.reps }}</td>
+          <td>{{ row.weight }}</td>
+          <td>{{ row.actual_reps }}</td>
+          <td class="actions-cell">
+            <a class="mini-button" href="{{ url_for('edit_workout_entry', entry_id=row.id) }}">Edit</a>
+            <form method="post" action="{{ url_for('delete_workout_entry', entry_id=row.id) }}" onsubmit="return confirm('Delete this workout entry?');">
+              <button class="danger-button" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No workout entries yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="section-title">
+    <div>
+      <h2>Measurements</h2>
+      <p class="small">Waist, chest, arms, thighs, and notes.</p>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Waist</th>
+          <th>Chest</th>
+          <th>Arm</th>
+          <th>Thigh</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in measurements %}
+        <tr>
+          <td>{{ row.measure_date }}</td>
+          <td>{{ row.waist or '' }}</td>
+          <td>{{ row.chest or '' }}</td>
+          <td>{{ row.arm or '' }}</td>
+          <td>{{ row.thigh or '' }}</td>
+          <td class="actions-cell">
+            <a class="mini-button" href="{{ url_for('edit_measurement', entry_id=row.id) }}">Edit</a>
+            <form method="post" action="{{ url_for('delete_measurement', entry_id=row.id) }}" onsubmit="return confirm('Delete this measurement?');">
+              <button class="danger-button" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No measurements yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

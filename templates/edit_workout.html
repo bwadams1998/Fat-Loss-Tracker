@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card edit-card">
+  <div class="section-title">
+    <div>
+      <h2>Edit workout entry</h2>
+      <p class="small">Fix one exercise entry without touching the rest of the workout.</p>
+    </div>
+    <a class="mini-button" href="{{ url_for('data_management') }}">Back</a>
+  </div>
+  <form method="post" class="form-grid">
+    <label>Date<input type="date" name="workout_date" value="{{ entry.workout_date }}"></label>
+    <label>Workout day
+      <select name="split_day">
+        {% for day in split_days %}
+        <option value="{{ day }}" {% if day == entry.split_day %}selected{% endif %}>{{ day }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Exercise<input name="exercise" value="{{ entry.exercise }}"></label>
+    <label>Sets<input name="sets" value="{{ entry.sets }}"></label>
+    <label>Rep target<input name="reps" value="{{ entry.reps }}"></label>
+    <label>Weight used<input name="weight" value="{{ entry.weight }}"></label>
+    <label>Actual reps<input name="actual_reps" value="{{ entry.actual_reps }}"></label>
+    <label class="wide">Notes<input name="notes" value="{{ entry.notes }}"></label>
+    <button>Save changes</button>
+  </form>
+</section>
+{% endblock %}

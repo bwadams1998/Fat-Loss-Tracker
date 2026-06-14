@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Workout log</h2>
+  <form method="post" class="form-grid">
+    <label>Date<input type="date" name="workout_date" value="{{ today }}"></label>
+    <label>Split day<select name="split_day">{% for d in split_days %}<option>{{ d }}</option>{% endfor %}</select></label>
+    <label>Exercise<input name="exercise" required></label>
+    <label>Sets<input name="sets" placeholder="3"></label>
+    <label>Reps<input name="reps" placeholder="8, 10, 12"></label>
+    <label>Weight<input name="weight" placeholder="185"></label>
+    <label class="wide">Notes<input name="notes" placeholder="1 to 2 reps left, form, pain, PR"></label>
+    <button>Save exercise</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Recent exercises</h2>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Date</th><th>Day</th><th>Exercise</th><th>Sets</th><th>Reps</th><th>Weight</th></tr>
+      {% for row in items %}
+      <tr><td>{{ row.workout_date }}</td><td>{{ row.split_day }}</td><td>{{ row.exercise }}</td><td>{{ row.sets }}</td><td>{{ row.reps }}</td><td>{{ row.weight }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</section>
+{% endblock %}

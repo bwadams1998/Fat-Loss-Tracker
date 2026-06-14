@@ -149,6 +149,69 @@ WORKOUT_PLAN = {
 init_db()
 
 
+def safe_float(value):
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def adaptive_macro_targets(goals, logs):
+    weights_by_date = []
+    for row in logs:
+        weight = safe_float(row["weight"])
+        if weight is not None:
+            weights_by_date.append((row["log_date"], weight))
+
+    weights_by_date = sorted(weights_by_date, key=lambda x: x[0], reverse=True)
+    latest_weight = weights_by_date[0][1] if weights_by_date else None
+
+    base_calories = int(goals["calories"] or 2300) if goals else 2300
+    target_weight = safe_float(goals["target_weight"]) if goals else None
+
+    recent_weights = [w for _, w in weights_by_date[:7]]
+    previous_weights = [w for _, w in weights_by_date[7:14]]
+    recent_avg = round(sum(recent_weights) / len(recent_weights), 1) if recent_weights else None
+    previous_avg = round(sum(previous_weights) / len(previous_weights), 1) if previous_weights else None
+    weekly_change = round(previous_avg - recent_avg, 1) if recent_avg is not None and previous_avg is not None else None
+
+    recommended_calories = base_calories
+    adjustment = 0
+    status = "Log 7 to 14 weigh ins for smarter calorie changes."
+
+    if weekly_change is not None:
+        if weekly_change < 0.5:
+            adjustment = -150
+            status = "Loss is slow. Drop calories by 150 or add steps."
+        elif weekly_change > 2.0:
+            adjustment = 100
+            status = "Loss is fast. Add 100 calories to protect performance."
+        else:
+            adjustment = 0
+            status = "Pace is on target. Keep calories the same."
+
+    recommended_calories = max(1800, base_calories + adjustment)
+
+    protein_bodyweight = latest_weight or target_weight or 225
+    protein = int(round(max(170, min(230, protein_bodyweight * 0.85))))
+    fat = int(round(max(55, recommended_calories * 0.25 / 9)))
+    carb_calories = recommended_calories - (protein * 4) - (fat * 9)
+    carbs = int(round(max(75, carb_calories / 4)))
+
+    return {
+        "calories": recommended_calories,
+        "protein": protein,
+        "carbs": carbs,
+        "fat": fat,
+        "base_calories": base_calories,
+        "adjustment": adjustment,
+        "recent_avg": recent_avg,
+        "previous_avg": previous_avg,
+        "weekly_change": weekly_change,
+        "status": status,
+    }
+
+
 def user_count():
     return db().execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"]
 
@@ -236,6 +299,7 @@ def dashboard():
     ).fetchall()
     weights = [row["weight"] for row in logs if row["weight"] is not None]
     latest_weight = weights[0] if weights else None
+    macro_targets = adaptive_macro_targets(goals, logs)
     start_weight = goals["start_weight"] if goals else None
     target_weight = goals["target_weight"] if goals else None
     lost = round(start_weight - latest_weight, 1) if start_weight and latest_weight else None
@@ -248,6 +312,7 @@ def dashboard():
         latest_weight=latest_weight,
         lost=lost,
         remaining=remaining,
+        macro_targets=macro_targets,
     )
 
 

@@ -217,3 +217,63 @@ tr:last-child td { border-bottom: 0; }
   .hero-actions { justify-content: stretch; }
   .soft-button { flex: 1; }
 }
+
+.macro-coach-card {
+  border: 1px solid rgba(99, 102, 241, 0.18);
+}
+
+.macro-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.macro-box {
+  border-radius: 18px;
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.macro-box span,
+.macro-box small,
+.coach-note span {
+  display: block;
+  color: var(--muted);
+}
+
+.macro-box strong {
+  display: block;
+  margin: 8px 0 4px;
+  font-size: clamp(1.6rem, 4vw, 2.3rem);
+  letter-spacing: -0.04em;
+}
+
+.coach-note {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.coach-note span {
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+@media (max-width: 820px) {
+  .macro-grid,
+  .coach-note {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .macro-grid,
+  .coach-note {
+    grid-template-columns: 1fr;
+  }
+}

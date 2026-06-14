@@ -1,12 +1,37 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="card narrow">
-  <h2>{% if first_user %}Create your login{% else %}Login{% endif %}</h2>
-  <form method="post" class="grid">
-    <label>Email<input name="email" type="email" required></label>
-    <label>Password<input name="password" type="password" required></label>
-    <button>{% if first_user %}Create account{% else %}Login{% endif %}</button>
+<section class="stats">
+  <div class="card"><span>Latest weight</span><strong>{{ latest_weight or 'No data' }}</strong></div>
+  <div class="card"><span>Lost</span><strong>{{ lost if lost is not none else 'No data' }}</strong></div>
+  <div class="card"><span>Remaining</span><strong>{{ remaining if remaining is not none else 'No data' }}</strong></div>
+  <div class="card"><span>Daily target</span><strong>{{ goals.calories }} cal</strong></div>
+</section>
+
+<section class="card">
+  <h2>Daily check in</h2>
+  <form method="post" class="form-grid">
+    <label>Date<input type="date" name="log_date" value="{{ today }}"></label>
+    <label>Weight<input type="number" step="0.1" name="weight"></label>
+    <label>Calories<input type="number" name="calories" placeholder="{{ goals.calories }}"></label>
+    <label>Protein<input type="number" name="protein" placeholder="{{ goals.protein }}"></label>
+    <label>Steps<input type="number" name="steps" placeholder="{{ goals.steps }}"></label>
+    <label>Cardio minutes<input type="number" name="cardio_minutes"></label>
+    <label class="wide">Notes<input name="notes" placeholder="hunger, sleep, workout quality"></label>
+    <button>Save day</button>
   </form>
-  <p class="small">First account becomes the owner. Use a strong password before hosting online.</p>
+</section>
+
+<section class="card">
+  <h2>Last 30 days</h2>
+  <div class="table-wrap">
+    <table>
+      <tr><th>Date</th><th>Weight</th><th>Calories</th><th>Protein</th><th>Steps</th><th>Cardio</th></tr>
+      {% for row in logs %}
+      <tr>
+        <td>{{ row.log_date }}</td><td>{{ row.weight or '' }}</td><td>{{ row.calories or '' }}</td><td>{{ row.protein or '' }}</td><td>{{ row.steps or '' }}</td><td>{{ row.cardio_minutes or '' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
 </section>
 {% endblock %}

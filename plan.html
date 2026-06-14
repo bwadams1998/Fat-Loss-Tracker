@@ -1,34 +1,96 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="stats">
-  <div class="card"><span>Latest weight</span><strong>{{ latest_weight or 'No data' }}</strong></div>
-  <div class="card"><span>Lost</span><strong>{{ lost if lost is not none else 'No data' }}</strong></div>
-  <div class="card"><span>Remaining</span><strong>{{ remaining if remaining is not none else 'No data' }}</strong></div>
-  <div class="card"><span>Daily target</span><strong>{{ goals.calories }} cal</strong></div>
+<section class="workout-hero card">
+  <div>
+    <p class="eyebrow">Workout logger</p>
+    <h2>{{ selected_day }}</h2>
+    <p class="small">Your exercises are already loaded. Enter weight, reps completed, and notes. Save only what you did.</p>
+  </div>
+  <form method="get" class="quick-day-picker">
+    <label>Workout day
+      <select name="day" onchange="this.form.submit()">
+        {% for d in split_days %}
+          <option value="{{ d }}" {% if d == selected_day %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+</section>
+
+<section class="card day-strip-card">
+  <div class="day-tabs workout-tabs">
+    {% for d in split_days %}
+      <a class="tab {% if d == selected_day %}active{% endif %}" href="{{ url_for('workouts', day=d) }}">{{ d }}</a>
+    {% endfor %}
+  </div>
 </section>
 
 <section class="card">
-  <h2>Daily check in</h2>
-  <form method="post" class="form-grid">
-    <label>Date<input type="date" name="log_date" value="{{ today }}"></label>
-    <label>Weight<input type="number" step="0.1" name="weight"></label>
-    <label>Calories<input type="number" name="calories" placeholder="{{ goals.calories }}"></label>
-    <label>Protein<input type="number" name="protein" placeholder="{{ goals.protein }}"></label>
-    <label>Steps<input type="number" name="steps" placeholder="{{ goals.steps }}"></label>
-    <label>Cardio minutes<input type="number" name="cardio_minutes"></label>
-    <label class="wide">Notes<input name="notes" placeholder="hunger, sleep, workout quality"></label>
-    <button>Save day</button>
+  <form method="post" class="preset-workout-form">
+    <input type="hidden" name="split_day" value="{{ selected_day }}">
+    <div class="log-header">
+      <label>Date
+        <input type="date" name="workout_date" value="{{ today }}">
+      </label>
+      <button class="save-workout">Save {{ selected_day }}</button>
+    </div>
+
+    <div class="exercise-list preset-list">
+      {% for item in plan_items %}
+      <div class="exercise-card preset-card">
+        <div class="exercise-main">
+          <div class="exercise-number">{{ loop.index }}</div>
+          <div>
+            <h3>{{ item.exercise }}</h3>
+            <div class="target-row">
+              <span>{{ item.sets }} sets</span>
+              <span>{{ item.reps }}</span>
+            </div>
+            {% if item.last %}
+              <p class="last-line">Last: {{ item.last.weight }} lb{% if item.last.actual_reps %}, reps {{ item.last.actual_reps }}{% endif %}, {{ item.last.workout_date }}</p>
+            {% else %}
+              <p class="last-line muted">No previous weight logged</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <input type="hidden" name="exercise" value="{{ item.exercise }}">
+        <input type="hidden" name="sets" value="{{ item.sets }}">
+        <input type="hidden" name="reps" value="{{ item.reps }}">
+
+        <div class="log-fields">
+          <label>Weight
+            <input name="weight" inputmode="decimal" placeholder="lb">
+          </label>
+          <label>Reps done
+            <input name="actual_reps" placeholder="8, 8, 7">
+          </label>
+          <label class="notes-field">Notes
+            <input name="notes" placeholder="1 rep left, felt good">
+          </label>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <button class="save-workout bottom-save">Save {{ selected_day }}</button>
   </form>
 </section>
 
 <section class="card">
-  <h2>Last 30 days</h2>
+  <h2>Recent workout history</h2>
   <div class="table-wrap">
     <table>
-      <tr><th>Date</th><th>Weight</th><th>Calories</th><th>Protein</th><th>Steps</th><th>Cardio</th></tr>
-      {% for row in logs %}
+      <tr><th>Date</th><th>Day</th><th>Exercise</th><th>Target</th><th>Weight</th><th>Reps done</th><th>Notes</th></tr>
+      {% for row in items %}
       <tr>
-        <td>{{ row.log_date }}</td><td>{{ row.weight or '' }}</td><td>{{ row.calories or '' }}</td><td>{{ row.protein or '' }}</td><td>{{ row.steps or '' }}</td><td>{{ row.cardio_minutes or '' }}</td>
+        <td>{{ row.workout_date }}</td>
+        <td>{{ row.split_day }}</td>
+        <td>{{ row.exercise }}</td>
+        <td>{{ row.sets }} x {{ row.reps }}</td>
+        <td>{{ row.weight }}</td>
+        <td>{{ row.actual_reps if row.actual_reps is defined else '' }}</td>
+        <td>{{ row.notes }}</td>
       </tr>
       {% endfor %}
     </table>

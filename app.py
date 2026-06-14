@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
 from flask import Flask, g, redirect, render_template, request, session, url_for, flash
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -45,6 +45,17 @@ def init_db():
             calories INTEGER DEFAULT 2300,
             protein INTEGER DEFAULT 180,
             steps INTEGER DEFAULT 10000,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS profiles (
+            user_id INTEGER PRIMARY KEY,
+            height_inches REAL DEFAULT 74,
+            age INTEGER DEFAULT 27,
+            sex TEXT DEFAULT 'male',
+            activity_level TEXT DEFAULT 'moderate',
+            training_days INTEGER DEFAULT 5,
+            deficit_rate REAL DEFAULT 1.25,
             FOREIGN KEY(user_id) REFERENCES users(id)
         );
 
@@ -156,7 +167,36 @@ def safe_float(value):
         return None
 
 
-def adaptive_macro_targets(goals, logs):
+
+def get_profile(uid):
+    profile = db().execute("SELECT * FROM profiles WHERE user_id = ?", (uid,)).fetchone()
+    if not profile:
+        db().execute("INSERT INTO profiles (user_id) VALUES (?)", (uid,))
+        db().commit()
+        profile = db().execute("SELECT * FROM profiles WHERE user_id = ?", (uid,)).fetchone()
+    return profile
+
+
+def activity_multiplier(activity_level):
+    return {
+        "sedentary": 1.2,
+        "light": 1.375,
+        "moderate": 1.55,
+        "high": 1.725,
+        "athlete": 1.9,
+    }.get(activity_level or "moderate", 1.55)
+
+
+def calculate_bmr(weight_lb, height_inches, age, sex):
+    if not weight_lb or not height_inches or not age:
+        return None
+    weight_kg = weight_lb * 0.45359237
+    height_cm = height_inches * 2.54
+    sex_offset = 5 if (sex or "male") == "male" else -161
+    return round((10 * weight_kg) + (6.25 * height_cm) - (5 * int(age)) + sex_offset)
+
+
+def adaptive_macro_targets(goals, logs, profile=None):
     weights_by_date = []
     for row in logs:
         weight = safe_float(row["weight"])
@@ -166,8 +206,9 @@ def adaptive_macro_targets(goals, logs):
     weights_by_date = sorted(weights_by_date, key=lambda x: x[0], reverse=True)
     latest_weight = weights_by_date[0][1] if weights_by_date else None
 
-    base_calories = int(goals["calories"] or 2300) if goals else 2300
     target_weight = safe_float(goals["target_weight"]) if goals else None
+    start_weight = safe_float(goals["start_weight"]) if goals else None
+    base_weight = latest_weight or start_weight or target_weight or 235
 
     recent_weights = [w for _, w in weights_by_date[:7]]
     previous_weights = [w for _, w in weights_by_date[7:14]]
@@ -175,10 +216,21 @@ def adaptive_macro_targets(goals, logs):
     previous_avg = round(sum(previous_weights) / len(previous_weights), 1) if previous_weights else None
     weekly_change = round(previous_avg - recent_avg, 1) if recent_avg is not None and previous_avg is not None else None
 
-    recommended_calories = base_calories
-    adjustment = 0
-    status = "Log 7 to 14 weigh ins for smarter calorie changes."
+    height_inches = safe_float(profile["height_inches"]) if profile else 74
+    age = int(profile["age"] or 27) if profile else 27
+    sex = profile["sex"] if profile else "male"
+    activity_level = profile["activity_level"] if profile else "moderate"
+    training_days = int(profile["training_days"] or 5) if profile else 5
+    deficit_rate = safe_float(profile["deficit_rate"]) if profile else 1.25
 
+    bmr = calculate_bmr(base_weight, height_inches, age, sex)
+    tdee = round(bmr * activity_multiplier(activity_level)) if bmr else None
+    weekly_deficit = (deficit_rate or 1.25) * 3500
+    daily_deficit = round(weekly_deficit / 7)
+    calculated_calories = max(1800, round((tdee or int(goals["calories"] or 2300)) - daily_deficit))
+
+    adjustment = 0
+    status = "Profile based targets. Log 7 to 14 weigh ins for adaptive changes."
     if weekly_change is not None:
         if weekly_change < 0.5:
             adjustment = -150
@@ -190,27 +242,44 @@ def adaptive_macro_targets(goals, logs):
             adjustment = 0
             status = "Pace is on target. Keep calories the same."
 
-    recommended_calories = max(1800, base_calories + adjustment)
+    recommended_calories = max(1800, calculated_calories + adjustment)
 
-    protein_bodyweight = latest_weight or target_weight or 225
-    protein = int(round(max(170, min(230, protein_bodyweight * 0.85))))
-    fat = int(round(max(55, recommended_calories * 0.25 / 9)))
+    protein = int(round(max(170, min(230, base_weight * 0.9))))
+    fat = int(round(max(55, min(90, recommended_calories * 0.25 / 9))))
     carb_calories = recommended_calories - (protein * 4) - (fat * 9)
     carbs = int(round(max(75, carb_calories / 4)))
+
+    remaining_lb = None
+    weeks_to_goal = None
+    estimated_goal_date = None
+    if latest_weight and target_weight and latest_weight > target_weight:
+        remaining_lb = round(latest_weight - target_weight, 1)
+        pace = weekly_change if weekly_change and weekly_change > 0.25 else deficit_rate
+        if pace and pace > 0:
+            weeks_to_goal = round(remaining_lb / pace, 1)
+            estimated_goal_date = (date.today() + timedelta(days=int(weeks_to_goal * 7))).isoformat()
 
     return {
         "calories": recommended_calories,
         "protein": protein,
         "carbs": carbs,
         "fat": fat,
-        "base_calories": base_calories,
+        "bmr": bmr,
+        "tdee": tdee,
+        "daily_deficit": daily_deficit,
+        "calculated_calories": calculated_calories,
         "adjustment": adjustment,
         "recent_avg": recent_avg,
         "previous_avg": previous_avg,
         "weekly_change": weekly_change,
         "status": status,
+        "estimated_goal_date": estimated_goal_date,
+        "weeks_to_goal": weeks_to_goal,
+        "remaining_lb": remaining_lb,
+        "activity_level": activity_level,
+        "training_days": training_days,
+        "deficit_rate": deficit_rate,
     }
-
 
 def user_count():
     return db().execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"]
@@ -242,6 +311,7 @@ def login():
                 (email, password_hash, datetime.utcnow().isoformat()),
             )
             db().execute("INSERT INTO goals (user_id) VALUES (?)", (cursor.lastrowid,))
+            db().execute("INSERT INTO profiles (user_id) VALUES (?)", (cursor.lastrowid,))
             db().commit()
             session["user_id"] = cursor.lastrowid
             return redirect(url_for("dashboard"))
@@ -299,7 +369,8 @@ def dashboard():
     ).fetchall()
     weights = [row["weight"] for row in logs if row["weight"] is not None]
     latest_weight = weights[0] if weights else None
-    macro_targets = adaptive_macro_targets(goals, logs)
+    profile = get_profile(uid)
+    macro_targets = adaptive_macro_targets(goals, logs, profile)
     start_weight = goals["start_weight"] if goals else None
     target_weight = goals["target_weight"] if goals else None
     lost = round(start_weight - latest_weight, 1) if start_weight and latest_weight else None
@@ -313,6 +384,7 @@ def dashboard():
         lost=lost,
         remaining=remaining,
         macro_targets=macro_targets,
+        profile=profile,
     )
 
 
@@ -410,6 +482,51 @@ def add_measurement():
     )
     db().commit()
     return redirect(url_for("settings"))
+
+
+@app.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    uid = session["user_id"]
+    current = get_profile(uid)
+    if request.method == "POST":
+        feet = request.form.get("height_feet") or "0"
+        inches = request.form.get("height_inches_extra") or "0"
+        try:
+            total_inches = (int(feet) * 12) + float(inches)
+        except ValueError:
+            total_inches = 74
+        db().execute(
+            """
+            UPDATE profiles
+            SET height_inches=?, age=?, sex=?, activity_level=?, training_days=?, deficit_rate=?
+            WHERE user_id=?
+            """,
+            (
+                total_inches,
+                request.form.get("age") or 27,
+                request.form.get("sex") or "male",
+                request.form.get("activity_level") or "moderate",
+                request.form.get("training_days") or 5,
+                request.form.get("deficit_rate") or 1.25,
+                uid,
+            ),
+        )
+        db().commit()
+        flash("Profile updated.")
+        return redirect(url_for("profile"))
+
+    goals = db().execute("SELECT * FROM goals WHERE user_id = ?", (uid,)).fetchone()
+    logs = db().execute("SELECT * FROM daily_logs WHERE user_id = ? ORDER BY log_date DESC LIMIT 30", (uid,)).fetchall()
+    macro_targets = adaptive_macro_targets(goals, logs, current)
+    height = safe_float(current["height_inches"]) or 74
+    return render_template(
+        "profile.html",
+        profile=current,
+        macro_targets=macro_targets,
+        height_feet=int(height // 12),
+        height_inches_extra=round(height % 12, 1),
+    )
 
 
 @app.route("/settings", methods=["GET", "POST"])

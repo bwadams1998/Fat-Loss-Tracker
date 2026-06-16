@@ -451,9 +451,25 @@ def workouts():
         plan_items.append({**item, "last": last})
 
     items = db().execute(
-        "SELECT * FROM workouts WHERE user_id = ? ORDER BY workout_date DESC, id DESC LIMIT 80",
+        "SELECT * FROM workouts WHERE user_id = ? ORDER BY workout_date DESC, id DESC LIMIT 120",
         (uid,),
     ).fetchall()
+
+    workout_sessions = []
+    session_map = {}
+    for row in items:
+        key = f"{row['workout_date']}|{row['split_day']}"
+        if key not in session_map:
+            session = {
+                "key": key.replace("|", "-"),
+                "workout_date": row["workout_date"],
+                "split_day": row["split_day"],
+                "entries": [],
+            }
+            session_map[key] = session
+            workout_sessions.append(session)
+        session_map[key]["entries"].append(row)
+
     return render_template(
         "workouts.html",
         today=today,
@@ -461,6 +477,7 @@ def workouts():
         selected_day=selected_day,
         plan_items=plan_items,
         items=items,
+        workout_sessions=workout_sessions,
     )
 
 

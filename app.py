@@ -1,39 +1,21 @@
 import os
+import sqlite3
 from datetime import date, datetime, timedelta
 from functools import wraps
-
-import psycopg2
-from psycopg2.extras import RealDictCursor
 from flask import Flask, g, redirect, render_template, request, session, url_for, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DB_PATH = os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "fat_loss_tracker.sqlite3"))
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret-key")
 
 
-class Database:
-    def __init__(self):
-        if not DATABASE_URL:
-            raise RuntimeError("DATABASE_URL is missing. Add it to your Railway web service variables.")
-        self.connection = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-
-    def execute(self, query, params=None):
-        cursor = self.connection.cursor()
-        cursor.execute(query.replace("?", "%s"), params or ())
-        return cursor
-
-    def commit(self):
-        self.connection.commit()
-
-    def close(self):
-        self.connection.close()
-
-
 def db():
     if "db" not in g:
-        g.db = Database()
+        g.db = sqlite3.connect(DB_PATH)
+        g.db.row_factory = sqlite3.Row
     return g.db
 
 
@@ -45,52 +27,41 @@ def close_db(error=None):
 
 
 def init_db():
-    if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL is missing. Add it to your Railway web service variables.")
-
-    connection = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-    cursor = connection.cursor()
-    cursor.execute(
+    connection = sqlite3.connect(DB_PATH)
+    connection.executescript(
         """
         CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             created_at TEXT NOT NULL
         );
-        """
-    )
-    cursor.execute(
-        """
+
         CREATE TABLE IF NOT EXISTS goals (
-            user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            user_id INTEGER PRIMARY KEY,
             start_weight REAL,
             target_weight REAL,
             target_date TEXT,
             calories INTEGER DEFAULT 2300,
             protein INTEGER DEFAULT 180,
-            steps INTEGER DEFAULT 10000
+            steps INTEGER DEFAULT 10000,
+            FOREIGN KEY(user_id) REFERENCES users(id)
         );
-        """
-    )
-    cursor.execute(
-        """
+
         CREATE TABLE IF NOT EXISTS profiles (
-            user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            user_id INTEGER PRIMARY KEY,
             height_inches REAL DEFAULT 74,
             age INTEGER DEFAULT 27,
             sex TEXT DEFAULT 'male',
             activity_level TEXT DEFAULT 'moderate',
             training_days INTEGER DEFAULT 5,
-            deficit_rate REAL DEFAULT 1.25
+            deficit_rate REAL DEFAULT 1.25,
+            FOREIGN KEY(user_id) REFERENCES users(id)
         );
-        """
-    )
-    cursor.execute(
-        """
+
         CREATE TABLE IF NOT EXISTS daily_logs (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
             log_date TEXT NOT NULL,
             weight REAL,
             calories INTEGER,
@@ -98,29 +69,25 @@ def init_db():
             steps INTEGER,
             cardio_minutes INTEGER,
             notes TEXT,
-            UNIQUE(user_id, log_date)
+            UNIQUE(user_id, log_date),
+            FOREIGN KEY(user_id) REFERENCES users(id)
         );
-        """
-    )
-    cursor.execute(
-        """
+
         CREATE TABLE IF NOT EXISTS measurements (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
             measure_date TEXT NOT NULL,
             waist REAL,
             chest REAL,
             arm REAL,
             thigh REAL,
-            notes TEXT
+            notes TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
         );
-        """
-    )
-    cursor.execute(
-        """
+
         CREATE TABLE IF NOT EXISTS workouts (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
             workout_date TEXT NOT NULL,
             split_day TEXT NOT NULL,
             exercise TEXT NOT NULL,
@@ -128,11 +95,15 @@ def init_db():
             reps TEXT,
             weight TEXT,
             actual_reps TEXT,
-            notes TEXT
+            notes TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
         );
         """
     )
-    cursor.execute("ALTER TABLE workouts ADD COLUMN IF NOT EXISTS actual_reps TEXT")
+    # Lightweight migration for existing Railway databases.
+    columns = [row[1] for row in connection.execute("PRAGMA table_info(workouts)").fetchall()]
+    if "actual_reps" not in columns:
+        connection.execute("ALTER TABLE workouts ADD COLUMN actual_reps TEXT")
     connection.commit()
     connection.close()
 
@@ -336,14 +307,13 @@ def login():
         if first_user:
             password_hash = generate_password_hash(password)
             cursor = db().execute(
-                "INSERT INTO users (email, password_hash, created_at) VALUES (?, ?, ?) RETURNING id",
+                "INSERT INTO users (email, password_hash, created_at) VALUES (?, ?, ?)",
                 (email, password_hash, datetime.utcnow().isoformat()),
             )
-            user_id = cursor.fetchone()["id"]
-            db().execute("INSERT INTO goals (user_id) VALUES (?)", (user_id,))
-            db().execute("INSERT INTO profiles (user_id) VALUES (?)", (user_id,))
+            db().execute("INSERT INTO goals (user_id) VALUES (?)", (cursor.lastrowid,))
+            db().execute("INSERT INTO profiles (user_id) VALUES (?)", (cursor.lastrowid,))
             db().commit()
-            session["user_id"] = user_id
+            session["user_id"] = cursor.lastrowid
             return redirect(url_for("dashboard"))
 
         user = db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()

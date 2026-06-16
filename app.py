@@ -6,12 +6,7 @@ from flask import Flask, g, redirect, render_template, request, session, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-
-# Railway SQLite persistence
-# If you mount a Railway volume at /data, the database will save there.
-# Locally, it falls back to the project folder.
-DEFAULT_DB_PATH = "/data/fat_loss_tracker.sqlite3" if os.path.isdir("/data") else os.path.join(BASE_DIR, "fat_loss_tracker.sqlite3")
-DB_PATH = os.environ.get("DATABASE_PATH", DEFAULT_DB_PATH)
+DB_PATH = os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "fat_loss_tracker.sqlite3"))
 DB_DIR = os.path.dirname(DB_PATH)
 if DB_DIR:
     os.makedirs(DB_DIR, exist_ok=True)
@@ -179,7 +174,7 @@ def safe_float(value):
 def get_profile(uid):
     profile = db().execute("SELECT * FROM profiles WHERE user_id = ?", (uid,)).fetchone()
     if not profile:
-        db().execute("INSERT INTO profiles (user_id) VALUES (?)", (uid,))
+        db().execute("INSERT OR IGNORE INTO profiles (user_id) VALUES (?)", (uid,))
         db().commit()
         profile = db().execute("SELECT * FROM profiles WHERE user_id = ?", (uid,)).fetchone()
     return profile
@@ -318,8 +313,8 @@ def login():
                 "INSERT INTO users (email, password_hash, created_at) VALUES (?, ?, ?)",
                 (email, password_hash, datetime.utcnow().isoformat()),
             )
-            db().execute("INSERT INTO goals (user_id) VALUES (?)", (cursor.lastrowid,))
-            db().execute("INSERT INTO profiles (user_id) VALUES (?)", (cursor.lastrowid,))
+            db().execute("INSERT OR IGNORE INTO goals (user_id) VALUES (?)", (cursor.lastrowid,))
+            db().execute("INSERT OR IGNORE INTO profiles (user_id) VALUES (?)", (cursor.lastrowid,))
             db().commit()
             session["user_id"] = cursor.lastrowid
             return redirect(url_for("dashboard"))

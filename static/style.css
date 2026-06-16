@@ -287,3 +287,17 @@ select {
   font: inherit;
 }
 .hero-goal small { display: block; margin-top: 6px; opacity: .75; }
+
+.auth-card {
+  max-width: 460px;
+  margin: 32px auto;
+}
+
+.auth-form input {
+  width: 100%;
+}
+
+.warning-text {
+  color: #b45309;
+  font-weight: 700;
+}

@@ -460,7 +460,7 @@ def workouts():
     for row in items:
         key = f"{row['workout_date']}|{row['split_day']}"
         if key not in session_map:
-            session = {
+            workout_session = {
                 "key": key.replace("|", "-"),
                 "workout_date": row["workout_date"],
                 "split_day": row["split_day"],

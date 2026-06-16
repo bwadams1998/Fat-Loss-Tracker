@@ -6,7 +6,15 @@ from flask import Flask, g, redirect, render_template, request, session, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DB_PATH = os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "fat_loss_tracker.sqlite3"))
+
+# Railway SQLite persistence
+# If you mount a Railway volume at /data, the database will save there.
+# Locally, it falls back to the project folder.
+DEFAULT_DB_PATH = "/data/fat_loss_tracker.sqlite3" if os.path.isdir("/data") else os.path.join(BASE_DIR, "fat_loss_tracker.sqlite3")
+DB_PATH = os.environ.get("DATABASE_PATH", DEFAULT_DB_PATH)
+DB_DIR = os.path.dirname(DB_PATH)
+if DB_DIR:
+    os.makedirs(DB_DIR, exist_ok=True)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret-key")

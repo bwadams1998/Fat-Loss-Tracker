@@ -466,8 +466,8 @@ def workouts():
                 "split_day": row["split_day"],
                 "entries": [],
             }
-            session_map[key] = session
-            workout_sessions.append(session)
+            session_map[key] = workout_session
+            workout_sessions.append(workout_session)
         session_map[key]["entries"].append(row)
 
     return render_template(

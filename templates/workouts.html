@@ -4,7 +4,7 @@
   <div>
     <p class="eyebrow">Workout logger</p>
     <h2>{{ selected_day }}</h2>
-    <p class="small">Your exercises are already loaded. Enter weight, reps completed, and notes. Save only what you did.</p>
+    <p class="small">Pick the workout day, enter your weights, reps, and notes, then save. Your history now saves as collapsible workout sessions.</p>
   </div>
   <form method="get" class="quick-day-picker">
     <label>Workout day
@@ -78,22 +78,51 @@
 </section>
 
 <section class="card">
-  <h2>Recent workout history</h2>
-  <div class="table-wrap">
-    <table>
-      <tr><th>Date</th><th>Day</th><th>Exercise</th><th>Target</th><th>Weight</th><th>Reps done</th><th>Notes</th></tr>
-      {% for row in items %}
-      <tr>
-        <td>{{ row.workout_date }}</td>
-        <td>{{ row.split_day }}</td>
-        <td>{{ row.exercise }}</td>
-        <td>{{ row.sets }} x {{ row.reps }}</td>
-        <td>{{ row.weight }}</td>
-        <td>{{ row.actual_reps if row.actual_reps is defined else '' }}</td>
-        <td>{{ row.notes }}</td>
-      </tr>
-      {% endfor %}
-    </table>
+  <div class="section-title">
+    <div>
+      <p class="eyebrow">History</p>
+      <h2>Workout sessions</h2>
+      <p class="small">Each saved workout is grouped by date and split day. Tap a session to open the exercises.</p>
+    </div>
   </div>
+
+  {% if workout_sessions %}
+    <div class="session-list">
+      {% for session in workout_sessions %}
+      <details class="session-card">
+        <summary>
+          <div class="session-summary-main">
+            <span class="session-day">{{ session.split_day }}</span>
+            <span class="session-date">{{ session.workout_date }}</span>
+          </div>
+          <div class="session-summary-meta">
+            <span>{{ session.entries|length }} entries</span>
+            <span class="chevron">Open</span>
+          </div>
+        </summary>
+
+        <div class="session-body">
+          {% for row in session.entries %}
+          <div class="session-exercise-row">
+            <div>
+              <h3>{{ row.exercise }}</h3>
+              <p>{{ row.sets }} sets, {{ row.reps }}</p>
+            </div>
+            <div class="session-stats">
+              <span><strong>{{ row.weight or '-' }}</strong> lb</span>
+              <span><strong>{{ row.actual_reps or '-' }}</strong> reps</span>
+            </div>
+            {% if row.notes %}
+              <p class="session-notes">{{ row.notes }}</p>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </details>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">No workouts logged yet.</p>
+  {% endif %}
 </section>
 {% endblock %}
